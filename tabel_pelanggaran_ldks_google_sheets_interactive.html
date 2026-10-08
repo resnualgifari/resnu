@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tabel Pelanggaran LDKS - Google Sheets Interactive</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- HTML2PDF Library for Direct PDF Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8f9fa;
+    }
+    .sheet-grid input:focus {
+      outline: 2px solid #1a73e8;
+      background-color: #e8f0fe;
+    }
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      body {
+        background-color: white !important;
+        padding: 0 !important;
+      }
+      .shadow-custom {
+        box-shadow: none !important;
+        border: none !important;
+      }
+      table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+      }
+      th, td {
+        border: 1px solid #000 !important;
+        padding: 4px 8px !important;
+        font-size: 11pt !important;
+      }
+      input {
+        border: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        width: 100% !important;
+      }
+    }
+  </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col">
+
+  <!-- TOP GOOGLE SHEETS HEADER BAR (NO PRINT) -->
+  <header class="no-print bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-emerald-600 text-white p-2 rounded-lg shadow-sm">
+          <i class="fa-solid fa-file-excel text-xl"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-gray-800 text-lg leading-tight">Tabel Pelanggaran LDKS (Sistem Poin Kredit)</h1>
+          <p class="text-xs text-gray-500">Google Sheets Generator & Simulator</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button onclick="manualSaveDraft()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs px-3 py-2 rounded-md transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer" title="Simpan Draf Saat Ini">
+          <i class="fa-solid fa-floppy-disk"></i> Simpan Draf
+        </button>
+        <button onclick="manualLoadDraft()" class="bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs px-3 py-2 rounded-md transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer" title="Muat Draf Terakhir">
+          <i class="fa-solid fa-cloud-arrow-down"></i> Muat Draf
+        </button>
+        <button onclick="addRow()" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-medium text-xs px-3 py-2 rounded-md transition flex items-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-plus"></i> Tambah Baris
+        </button>
+        <button onclick="copyToClipboard()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3 py-2 rounded-md transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">
+          <i class="fa-solid fa-copy"></i> Salin ke Google Sheets
+        </button>
+        <button onclick="downloadPDF()" class="bg-red-600 hover:bg-red-700 text-white font-medium text-xs px-3 py-2 rounded-md transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">
+          <i class="fa-solid fa-file-pdf"></i> Unduh PDF
+        </button>
+        <button onclick="exportCSV()" class="bg-slate-700 hover:bg-slate-800 text-white font-medium text-xs px-3 py-2 rounded-md transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">
+          <i class="fa-solid fa-file-csv"></i> Unduh CSV
+        </button>
+        <button onclick="printTable()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs px-3 py-2 rounded-md transition flex items-center gap-1.5 border border-gray-300 active:scale-95 cursor-pointer">
+          <i class="fa-solid fa-print"></i> Cetak
+        </button>
+        <button onclick="openResetModal()" class="bg-red-50 hover:bg-red-100 text-red-600 font-medium text-xs px-2.5 py-2 rounded-md transition border border-red-200 cursor-pointer" title="Reset Semua Data">
+          <i class="fa-solid fa-rotate-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- FORMULA BAR DISPLAY (NO PRINT) -->
+    <div class="bg-gray-50 border-t border-gray-200 px-4 py-1.5 flex items-center justify-between text-xs text-gray-600">
+      <div class="flex items-center space-x-3 overflow-hidden">
+        <span class="font-serif italic font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded">fx</span>
+        <span class="text-gray-400">|</span>
+        <span id="formulaBar" class="font-mono text-emerald-700 font-semibold truncate">
+          Rumus Sisa Poin = 150 - SUM(Pengurangan)
+        </span>
+      </div>
+      <!-- Indikator Status Auto-Save -->
+      <div id="saveStatus" class="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-full font-medium shrink-0">
+        <i class="fa-solid fa-cloud-check text-emerald-600"></i>
+        <span>Tersimpan Otomatis</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6">
+    <div id="printableArea" class="bg-white rounded-xl shadow-custom border border-gray-200 p-6 md:p-8">
+
+      <!-- HEADER JUDUL EVENT -->
+      <div class="text-center mb-6 pb-4 border-b border-gray-200">
+        <h2 class="text-xl md:text-2xl font-bold uppercase tracking-wide text-gray-900">Tabel Pelanggaran Kelompok</h2>
+        <h3 class="text-base md:text-lg font-semibold text-emerald-800 mt-1">Latihan Dasar Kepemimpinan Siswa (LDKS)</h3>
+        <p class="text-xs md:text-sm text-gray-500 mt-1">Sistem Pengurangan Poin Kredit (Modal Awal: 150 Poin)</p>
+      </div>
+
+      <!-- METADATA INFORMASI KELOMPOK -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div class="space-y-2">
+          <div class="flex items-center">
+            <label class="w-32 text-xs font-semibold text-gray-600">Hari / Tanggal:</label>
+            <input type="text" id="tglInput" value="Jum'at 3 Oktober - Sabtu 4 Oktober 2025" 
+              oninput="triggerAutoSave()" onblur="saveDataToCloud()"
+              class="flex-1 text-sm bg-white border border-gray-300 rounded px-2.5 py-1 focus:ring-1 focus:ring-emerald-500 font-medium">
+          </div>
+          <div class="flex items-center">
+            <label class="w-32 text-xs font-semibold text-gray-600">Nama Kelompok:</label>
+            <input type="text" id="kelompokInput" placeholder="Masukkan Nama Kelompok..." value="Kelompok 1 - Garuda" 
+              oninput="triggerAutoSave()" onblur="saveDataToCloud()"
+              class="flex-1 text-sm bg-white border border-gray-300 rounded px-2.5 py-1 font-bold text-emerald-900 focus:ring-1 focus:ring-emerald-500">
+          </div>
+          <div class="flex items-center">
+            <label class="w-32 text-xs font-semibold text-gray-600">Nama Panitia:</label>
+            <input type="text" id="panitiaInput" placeholder="Nama PJ Panitia" 
+              oninput="triggerAutoSave()" onblur="saveDataToCloud()"
+              class="flex-1 text-sm bg-white border border-gray-300 rounded px-2.5 py-1 focus:ring-1 focus:ring-emerald-500">
+          </div>
+        </div>
+
+        <!-- REKAP POIN CARD (NO PRINT) -->
+        <div class="no-print bg-white p-3 rounded-lg border border-gray-200 flex flex-col justify-between">
+          <div class="flex justify-between items-center text-xs text-gray-500 mb-1">
+            <span>Ringkasan Poin Real-time</span>
+            <span class="text-emerald-600 font-mono font-bold">Model 150 Poin</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center my-auto">
+            <div class="bg-gray-100 p-2 rounded">
+              <div class="text-[10px] text-gray-500 uppercase font-semibold">Poin Awal</div>
+              <div class="text-base font-bold text-gray-800">150</div>
+            </div>
+            <div class="bg-red-50 p-2 rounded">
+              <div class="text-[10px] text-red-600 uppercase font-semibold">Total Terpotong</div>
+              <div id="totalDeductedBadge" class="text-base font-bold text-red-600">0</div>
+            </div>
+            <div id="statusBox" class="bg-emerald-50 p-2 rounded transition-colors duration-300">
+              <div class="text-[10px] text-emerald-700 uppercase font-semibold">Sisa Poin Akhir</div>
+              <div id="remainingPointsBadge" class="text-base font-bold text-emerald-700">150</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPREADSHEET TABLE -->
+      <div class="overflow-x-auto">
+        <table id="sheetsTable" class="w-full text-left text-sm border-collapse sheet-grid">
+          <thead>
+            <tr class="bg-emerald-800 text-white text-xs font-semibold uppercase tracking-wider">
+              <th class="p-2.5 border border-emerald-900 text-center w-12">No</th>
+              <th class="p-2.5 border border-emerald-900 min-w-[180px]">Nama Pelanggaran</th>
+              <th class="p-2.5 border border-emerald-900 min-w-[200px]">Keterangan Pelanggaran</th>
+              <th class="p-2.5 border border-emerald-900 text-center w-28">Poin (-)...</th>
+              <th class="p-2.5 border border-emerald-900 text-center w-32">Total Pengurangan</th>
+              <th class="p-2.5 border border-emerald-900 text-center w-28">Sisa Poin</th>
+              <th class="p-2.5 border border-emerald-900 min-w-[150px]">Catatan / PJ</th>
+              <th class="p-2.5 border border-emerald-900 text-center w-12 no-print">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-gray-200">
+            <!-- Rows injected by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SIGNATURE SECTION -->
+      <div class="mt-12 pt-6 border-t border-gray-300 grid grid-cols-2 gap-8 text-center">
+        <div>
+          <p class="text-xs font-medium text-gray-500 mb-12">Mengetahui,</p>
+          <p class="font-bold text-gray-800 underline decoration-1 text-sm">Asfa Manazhiro Dzhini</p>
+          <p class="text-xs text-gray-600">Ketua Pelaksana LDKS</p>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-gray-500 mb-12">Mengetahui,</p>
+          <p class="font-bold text-gray-800 underline decoration-1 text-sm">RA Rizkia Puspita Utami</p>
+          <p class="text-xs text-gray-600">Ketua OSIS</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="no-print fixed bottom-5 right-5 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg text-xs flex items-center space-x-2 transition-opacity duration-300 opacity-0 pointer-events-none z-50">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toastMsg">Berhasil disimpan</span>
+  </div>
+
+  <!-- MODAL COPY TEXT -->
+  <div id="copyModal" class="no-print fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-5 space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="font-bold text-gray-800 text-sm flex items-center gap-2">
+          <i class="fa-solid fa-clipboard text-blue-600"></i> Salin Teks ke Google Sheets
+        </h3>
+        <button onclick="closeCopyModal()" class="text-gray-400 hover:text-gray-600 text-lg cursor-pointer">&times;</button>
+      </div>
+      <p class="text-xs text-gray-600 leading-relaxed">
+        Sistem iFrame mengamankan papan klip otomatis. Silakan klik tombol <b>"Pilih & Salin Teks"</b> di bawah, lalu tekan <kbd class="bg-gray-100 px-1 py-0.5 rounded border">Ctrl + C</kbd> dan tempel langsung di Google Sheets:
+      </p>
+      <textarea id="copyModalTextArea" class="w-full h-36 p-2.5 text-xs font-mono border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none" readonly></textarea>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="selectAndCopyModalText()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-sm transition">
+          <i class="fa-solid fa-copy mr-1"></i> Pilih & Salin Teks
+        </button>
+        <button onclick="closeCopyModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium px-4 py-2 rounded-lg transition">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRM RESET -->
+  <div id="resetModal" class="no-print fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 space-y-4">
+      <div class="flex items-center space-x-3 text-red-600">
+        <div class="bg-red-100 p-2.5 rounded-full"><i class="fa-solid fa-triangle-exclamation text-lg"></i></div>
+        <h3 class="font-bold text-gray-800 text-base">Kosongkan Semua Data?</h3>
+      </div>
+      <p class="text-xs text-gray-600 leading-relaxed">
+        Apakah Anda yakin ingin mengosongkan seluruh isian tabel? Tindakan ini tidak dapat dibatalkan.
+      </p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeResetModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-4 py-2 rounded-lg transition cursor-pointer">
+          Batal
+        </button>
+        <button onclick="confirmResetData()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-sm transition cursor-pointer">
+          Ya, Kosongkan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const INITIAL_POINTS = 150;
+    const DEFAULT_ROW_COUNT = 25;
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'ldks-tabel-app';
+
+    let db = null;
+    let authUser = null;
+    let authPromise = null;
+
+    async function ensureAuth() {
+      if (authUser && db) return true;
+      if (!authPromise) {
+        authPromise = (async () => {
+          try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+              const firebaseConfig = JSON.parse(__firebase_config);
+              const app = initializeApp(firebaseConfig);
+              const auth = getAuth(app);
+              db = getFirestore(app);
+
+              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                const userCred = await signInWithCustomToken(auth, __initial_auth_token);
+                authUser = userCred.user;
+              } else {
+                const userCred = await signInAnonymously(auth);
+                authUser = userCred.user;
+              }
+              return true;
+            }
+          } catch (err) {
+            console.warn("Gagal inisialisasi otentikasi cloud:", err);
+          }
+          return false;
+        })();
+      }
+      return await authPromise;
+    }
+
+    // Default Table Data
+    let tableData = Array.from({ length: DEFAULT_ROW_COUNT }, (_, i) => ({
+      no: i + 1,
+      pelanggaran: "",
+      ketPelanggaran: "",
+      poin: "",
+      keterangan: ""
+    }));
+
+    let saveDebounceTimer = null;
+
+    function triggerAutoSave() {
+      updateSaveStatusUI(false, "Menyimpan...");
+      clearTimeout(saveDebounceTimer);
+      saveDebounceTimer = setTimeout(() => {
+        saveDataToCloud();
+      }, 250);
+    }
+
+    function updateSaveStatusUI(isSaved, text) {
+      const saveStatus = document.getElementById("saveStatus");
+      if (!saveStatus) return;
+      if (isSaved) {
+        saveStatus.className = "flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-full font-medium shrink-0";
+        saveStatus.innerHTML = `<i class="fa-solid fa-cloud-check text-emerald-600"></i> <span>${text}</span>`;
+      } else {
+        saveStatus.className = "flex items-center gap-1.5 text-xs text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-full font-medium shrink-0";
+        saveStatus.innerHTML = `<i class="fa-solid fa-rotate fa-spin text-amber-600"></i> <span>${text}</span>`;
+      }
+    }
+
+    async function saveDataToCloud() {
+      clearTimeout(saveDebounceTimer);
+      const payload = {
+        tgl: document.getElementById("tglInput")?.value || "",
+        kelompok: document.getElementById("kelompokInput")?.value || "",
+        panitia: document.getElementById("panitiaInput")?.value || "",
+        tableData: tableData,
+        lastUpdated: new Date().toISOString()
+      };
+
+      // 1. Simpan ke LocalStorage
+      let localSaved = false;
+      try {
+        localStorage.setItem('ldks_draft_data', JSON.stringify(payload));
+        localSaved = true;
+      } catch (err) {
+        console.warn("Gagal menyimpan ke localStorage:", err);
+      }
+
+      // 2. Simpan ke Firestore
+      let cloudSaved = false;
+      const authed = await ensureAuth();
+      if (authed && db && authUser) {
+        try {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ldks_sheets', 'current_draft');
+          await setDoc(docRef, payload);
+          cloudSaved = true;
+        } catch (e) {
+          console.warn("Gagal menyimpan ke cloud:", e);
+        }
+      }
+
+      if (localSaved || cloudSaved) {
+        updateSaveStatusUI(true, cloudSaved ? "Tersimpan Otomatis" : "Tersimpan di Browser");
+        return true;
+      }
+      
+      updateSaveStatusUI(false, "Gagal Menyimpan");
+      return false;
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const localRaw = localStorage.getItem('ldks_draft_data');
+        if (localRaw) {
+          const data = JSON.parse(localRaw);
+          if (data.tgl && document.getElementById("tglInput")) document.getElementById("tglInput").value = data.tgl;
+          if (data.kelompok && document.getElementById("kelompokInput")) document.getElementById("kelompokInput").value = data.kelompok;
+          if (data.panitia && document.getElementById("panitiaInput")) document.getElementById("panitiaInput").value = data.panitia;
+          if (Array.isArray(data.tableData) && data.tableData.length > 0) {
+            tableData = data.tableData;
+          }
+          renderTable();
+          updateSaveStatusUI(true, "Draf Dimuat");
+          return true;
+        }
+      } catch (e) {
+        console.warn("Gagal memuat dari localStorage:", e);
+      }
+      return false;
+    }
+
+    async function manualSaveDraft() {
+      showToast("Menyimpan draf...");
+      updateSaveStatusUI(false, "Menyimpan Draf...");
+      const success = await saveDataToCloud();
+      if (success) {
+        showToast("Draf berhasil disimpan!");
+      } else {
+        showToast("Gagal menyimpan draf.");
+      }
+    }
+
+    async function manualLoadDraft() {
+      showToast("Memuat draf...");
+      const loadedLocal = loadFromLocalStorage();
+
+      const authed = await ensureAuth();
+      if (authed && db && authUser) {
+        try {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ldks_sheets', 'current_draft');
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.tgl) document.getElementById("tglInput").value = data.tgl;
+            if (data.kelompok) document.getElementById("kelompokInput").value = data.kelompok;
+            if (data.panitia) document.getElementById("panitiaInput").value = data.panitia;
+            if (Array.isArray(data.tableData) && data.tableData.length > 0) {
+              tableData = data.tableData;
+            }
+            renderTable();
+            updateSaveStatusUI(true, "Draf Dimuat (Cloud)");
+            showToast("Draf berhasil dimuat!");
+            return;
+          }
+        } catch (err) {
+          console.error("Gagal memuat draf dari cloud:", err);
+        }
+      }
+
+      if (loadedLocal) {
+        showToast("Draf berhasil dimuat!");
+      } else {
+        showToast("Belum ada draf tersimpan.");
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
+
+      let currentRemaining = INITIAL_POINTS;
+      let totalDeduction = 0;
+
+      tableData.forEach((row, index) => {
+        const poinVal = parseFloat(row.poin);
+        const hasPoin = !isNaN(poinVal) && row.poin !== "";
+
+        if (hasPoin) {
+          totalDeduction += poinVal;
+          currentRemaining -= poinVal;
+        }
+
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-gray-50 transition-colors";
+
+        tr.innerHTML = `
+          <td class="p-1.5 border border-gray-300 text-center font-mono text-xs text-gray-500 font-semibold bg-gray-50/50">${index + 1}</td>
+          <td class="p-1 border border-gray-300">
+            <input type="text" value="${escapeHtml(row.pelanggaran)}" 
+              oninput="updateRow(${index}, 'pelanggaran', this.value)" 
+              onblur="saveDataToCloud()"
+              placeholder="Nama pelanggaran..." 
+              class="w-full px-2 py-1 text-xs border-none focus:bg-blue-50/50 rounded text-gray-800 font-medium">
+          </td>
+          <td class="p-1 border border-gray-300">
+            <input type="text" value="${escapeHtml(row.ketPelanggaran || '')}" 
+              oninput="updateRow(${index}, 'ketPelanggaran', this.value)" 
+              onblur="saveDataToCloud()"
+              placeholder="Detail / alasan / kronologi..." 
+              class="w-full px-2 py-1 text-xs border-none focus:bg-blue-50/50 rounded text-gray-700">
+          </td>
+          <td class="p-1 border border-gray-300 text-center">
+            <input type="number" min="0" value="${row.poin}" 
+              oninput="updateRow(${index}, 'poin', this.value)" 
+              onblur="saveDataToCloud()"
+              onfocus="showFormula(${index})"
+              placeholder="0" 
+              class="w-full px-2 py-1 text-xs border-none text-center font-semibold text-red-600 focus:bg-blue-50/50 rounded">
+          </td>
+          <td class="p-2 border border-gray-300 text-center font-mono text-xs font-bold ${hasPoin ? 'text-red-600 bg-red-50/50' : 'text-gray-400'}">
+            ${hasPoin ? totalDeduction : '-'}
+          </td>
+          <td class="p-2 border border-gray-300 text-center font-mono text-xs font-bold ${hasPoin ? (currentRemaining <= 50 ? 'text-red-600 bg-red-50' : 'text-emerald-700 bg-emerald-50/30') : 'text-gray-400'}">
+            ${hasPoin ? currentRemaining : '-'}
+          </td>
+          <td class="p-1 border border-gray-300">
+            <input type="text" value="${escapeHtml(row.keterangan)}" 
+              oninput="updateRow(${index}, 'keterangan', this.value)" 
+              onblur="saveDataToCloud()"
+              placeholder="PJ / Catatan..." 
+              class="w-full px-2 py-1 text-xs border-none focus:bg-blue-50/50 rounded text-gray-600">
+          </td>
+          <td class="p-1 border border-gray-300 text-center no-print">
+            <button onclick="deleteRow(${index})" class="text-gray-400 hover:text-red-500 p-1 text-xs cursor-pointer" title="Hapus Baris">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      recalculateTotals();
+    }
+
+    function updateRow(index, field, value) {
+      tableData[index][field] = value;
+      if (field === 'poin') {
+        recalculateTotals();
+      }
+      triggerAutoSave();
+    }
+
+    function recalculateTotals() {
+      const tbody = document.getElementById("tableBody");
+      let currentRemaining = INITIAL_POINTS;
+      let totalDeduction = 0;
+
+      tableData.forEach((row, index) => {
+        const poinVal = parseFloat(row.poin);
+        const hasPoin = !isNaN(poinVal) && row.poin !== "";
+
+        if (hasPoin) {
+          totalDeduction += poinVal;
+          currentRemaining -= poinVal;
+        }
+
+        const tr = tbody.children[index];
+        if (tr) {
+          const totalCell = tr.children[4];
+          const remCell = tr.children[5];
+
+          totalCell.className = `p-2 border border-gray-300 text-center font-mono text-xs font-bold ${hasPoin ? 'text-red-600 bg-red-50/50' : 'text-gray-400'}`;
+          totalCell.innerText = hasPoin ? totalDeduction : '-';
+
+          remCell.className = `p-2 border border-gray-300 text-center font-mono text-xs font-bold ${hasPoin ? (currentRemaining <= 50 ? 'text-red-600 bg-red-50' : 'text-emerald-700 bg-emerald-50/30') : 'text-gray-400'}`;
+          remCell.innerText = hasPoin ? currentRemaining : '-';
+        }
+      });
+
+      document.getElementById("totalDeductedBadge").innerText = totalDeduction;
+      const remBadge = document.getElementById("remainingPointsBadge");
+      remBadge.innerText = currentRemaining;
+
+      const statusBox = document.getElementById("statusBox");
+      if (currentRemaining <= 0) {
+        statusBox.className = "bg-red-100 p-2 rounded border border-red-300";
+        remBadge.className = "text-base font-bold text-red-700";
+      } else if (currentRemaining <= 50) {
+        statusBox.className = "bg-amber-100 p-2 rounded border border-amber-300";
+        remBadge.className = "text-base font-bold text-amber-700";
+      } else {
+        statusBox.className = "bg-emerald-50 p-2 rounded border border-emerald-200";
+        remBadge.className = "text-base font-bold text-emerald-700";
+      }
+    }
+
+    function addRow() {
+      tableData.push({
+        no: tableData.length + 1,
+        pelanggaran: "",
+        ketPelanggaran: "",
+        poin: "",
+        keterangan: ""
+      });
+      renderTable();
+      triggerAutoSave();
+      showToast("Baris baru ditambahkan");
+    }
+
+    function deleteRow(index) {
+      if (tableData.length <= 1) {
+        showToast("Minimal harus ada 1 baris");
+        return;
+      }
+      tableData.splice(index, 1);
+      renderTable();
+      triggerAutoSave();
+    }
+
+    function openResetModal() {
+      document.getElementById("resetModal").classList.remove("hidden");
+    }
+
+    function closeResetModal() {
+      document.getElementById("resetModal").classList.add("hidden");
+    }
+
+    function confirmResetData() {
+      tableData = Array.from({ length: DEFAULT_ROW_COUNT }, (_, i) => ({
+        no: i + 1,
+        pelanggaran: "",
+        ketPelanggaran: "",
+        poin: "",
+        keterangan: ""
+      }));
+      try {
+        localStorage.removeItem('ldks_draft_data');
+      } catch (e) {}
+      closeResetModal();
+      renderTable();
+      triggerAutoSave();
+      showToast("Tabel berhasil direset");
+    }
+
+    function showFormula(index) {
+      const rowNum = index + 5;
+      document.getElementById("formulaBar").innerText = `Total Pengurangan = SUM(D$5:D${rowNum}) | Sisa Poin = 150 - E${rowNum}`;
+    }
+
+    function escapeHtml(text) {
+      return text ? text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : "";
+    }
+
+    function generateTSVDataWithFormulas() {
+      const kelompok = document.getElementById("kelompokInput").value || "Kelompok";
+      const tgl = document.getElementById("tglInput").value || "";
+      
+      let copyText = `Tabel Pelanggaran Kelompok - ${kelompok}\n`;
+      copyText += `Hari/Tanggal:\t${tgl}\tPoin Awal:\t150\n\n`;
+      copyText += `No\tPelanggaran\tKeterangan Pelanggaran\tPoin Pengurangan\tTotal Pengurangan\tSisa Poin\tCatatan/PJ\n`;
+
+      tableData.forEach((row, i) => {
+        const rowNum = i + 5;
+        const totalFormula = `=IF(D${rowNum}="","",SUM(D$5:D${rowNum}))`;
+        const remFormula = `=IF(D${rowNum}="","",150-E${rowNum})`;
+        copyText += `${i + 1}\t${row.pelanggaran}\t${row.ketPelanggaran || ''}\t${row.poin}\t${totalFormula}\t${remFormula}\t${row.keterangan}\n`;
+      });
+
+      return copyText;
+    }
+
+    function copyToClipboard() {
+      const copyText = generateTSVDataWithFormulas();
+
+      const textArea = document.createElement("textarea");
+      textArea.value = copyText;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      textArea.style.top = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      let successful = false;
+      try {
+        successful = document.execCommand('copy');
+      } catch (err) {
+        successful = false;
+      }
+      document.body.removeChild(textArea);
+
+      if (successful) {
+        showToast("Data + Rumus tersalin! Tempel di Google Sheets (Ctrl+V)");
+      } else {
+        openCopyModal(copyText);
+      }
+    }
+
+    function openCopyModal(text) {
+      const modal = document.getElementById("copyModal");
+      const modalTextArea = document.getElementById("copyModalTextArea");
+      modalTextArea.value = text;
+      modal.classList.remove("hidden");
+    }
+
+    function closeCopyModal() {
+      document.getElementById("copyModal").classList.add("hidden");
+    }
+
+    function selectAndCopyModalText() {
+      const modalTextArea = document.getElementById("copyModalTextArea");
+      modalTextArea.focus();
+      modalTextArea.select();
+      try {
+        document.execCommand('copy');
+        showToast("Teks berhasil disalin!");
+      } catch (e) {
+        showToast("Silakan tekan Ctrl+C untuk menyalin");
+      }
+    }
+
+    function downloadPDF() {
+      showToast("Menyiapkan dokumen PDF...");
+      const element = document.getElementById("printableArea");
+      const kelompok = document.getElementById("kelompokInput").value || "Kelompok";
+
+      const opt = {
+        margin:       [8, 8, 8, 8],
+        filename:     `Tabel_Pelanggaran_LDKS_${kelompok.replace(/\s+/g, '_')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      if (window.html2pdf) {
+        html2pdf().set(opt).from(element).save().then(() => {
+          showToast("PDF berhasil diunduh!");
+        }).catch(err => {
+          console.error("PDF Export error:", err);
+          printTable();
+        });
+      } else {
+        printTable();
+      }
+    }
+
+    function printTable() {
+      window.focus();
+      window.print();
+    }
+
+    function exportCSV() {
+      const kelompok = document.getElementById("kelompokInput").value || "Kelompok";
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += `"No","Nama Pelanggaran","Keterangan Pelanggaran","Poin Pengurangan","Total Pengurangan","Sisa Poin","Catatan/PJ"\n`;
+
+      let currentRemaining = INITIAL_POINTS;
+      let totalDeduction = 0;
+
+      tableData.forEach((row, i) => {
+        const poinVal = parseFloat(row.poin);
+        const hasPoin = !isNaN(poinVal) && row.poin !== "";
+        if (hasPoin) {
+          totalDeduction += poinVal;
+          currentRemaining -= poinVal;
+        }
+        csvContent += `"${i + 1}","${(row.pelanggaran || '').replace(/"/g, '""')}","${(row.ketPelanggaran || '').replace(/"/g, '""')}","${row.poin}","${hasPoin ? totalDeduction : ''}","${hasPoin ? currentRemaining : ''}","${(row.keterangan || '').replace(/"/g, '""')}"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Pelanggaran_LDKS_${kelompok.replace(/\s+/g, '_')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("File CSV berhasil diunduh");
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      document.getElementById("toastMsg").innerText = msg;
+      toast.classList.remove("opacity-0", "pointer-events-none");
+      toast.classList.add("opacity-100");
+      setTimeout(() => {
+        toast.classList.remove("opacity-100");
+        toast.classList.add("opacity-0", "pointer-events-none");
+      }, 3000);
+    }
+
+    // Expose functions to global window for inline event handlers
+    window.addRow = addRow;
+    window.deleteRow = deleteRow;
+    window.openResetModal = openResetModal;
+    window.closeResetModal = closeResetModal;
+    window.confirmResetData = confirmResetData;
+    window.updateRow = updateRow;
+    window.copyToClipboard = copyToClipboard;
+    window.downloadPDF = downloadPDF;
+    window.exportCSV = exportCSV;
+    window.printTable = printTable;
+    window.closeCopyModal = closeCopyModal;
+    window.selectAndCopyModalText = selectAndCopyModalText;
+    window.showFormula = showFormula;
+    window.triggerAutoSave = triggerAutoSave;
+    window.saveDataToCloud = saveDataToCloud;
+    window.manualSaveDraft = manualSaveDraft;
+    window.manualLoadDraft = manualLoadDraft;
+
+    // Save immediately before refresh, unload, or tab switch
+    window.addEventListener('beforeunload', () => {
+      clearTimeout(saveDebounceTimer);
+      saveDataToCloud();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        clearTimeout(saveDebounceTimer);
+        saveDataToCloud();
+      }
+    });
+
+    // Initialize on page load
+    window.onload = async () => {
+      loadFromLocalStorage();
+      renderTable();
+      const authed = await ensureAuth();
+      if (authed) {
+        await manualLoadDraft();
+      }
+    };
+  </script>
+</body>
+</html>
